@@ -196,11 +196,11 @@ def main():
     st.set_page_config(page_title="Emoji Story Generator", page_icon="📚")
     st.title("Emoji Story Generator")
     
-    # 初始化session state来存储选中的emoji
+    # Initialize session state for selected emojis
     if 'selected_emojis' not in st.session_state:
         st.session_state.selected_emojis = []
     
-    # 创建选项卡布局
+    # Create tab layout
     ENGLISH_CATEGORIES = {
         "Faces & Emotions": EMOJI_CATEGORIES["表情与情绪"],
         "Animals": EMOJI_CATEGORIES["动物"],
@@ -214,33 +214,30 @@ def main():
     
     tabs = st.tabs(list(ENGLISH_CATEGORIES.keys()))
     
-    # 在每个选项卡中显示对应类别的emoji
+    # Display emojis in each tab
     for tab, (category, emojis) in zip(tabs, ENGLISH_CATEGORIES.items()):
         with tab:
             st.write(f"Select {category}:")
-            # 将emoji列表分成多列显示
-            cols = st.columns(8)  # 每行8个emoji
+            cols = st.columns(8)
             for i, emoji in enumerate(emojis):
                 if cols[i % 8].button(emoji, key=f"{category}_{emoji}"):
                     if emoji not in st.session_state.selected_emojis:
-                        if len(st.session_state.selected_emojis) < 5:  # 限制最多选择5个emoji
+                        if len(st.session_state.selected_emojis) < 5:
                             st.session_state.selected_emojis.append(emoji)
                         else:
                             st.warning("Maximum 5 emojis allowed!")
     
-    # 显示已选择的emoji
+    # Display selected emojis
     if st.session_state.selected_emojis:
         st.write("---")
         st.write("Selected emojis:", " ".join(st.session_state.selected_emojis))
         
-        # 添加清除选择按钮
         col1, col2 = st.columns([1, 4])
         with col1:
             if st.button("Clear Selection"):
                 st.session_state.selected_emojis = []
-                st.experimental_rerun()
+                st.rerun()
         
-        # 生成故事按钮
         with col2:
             if st.button("Generate Story"):
                 story = generate_story_with_ai(st.session_state.selected_emojis)
@@ -252,17 +249,15 @@ def main():
     else:
         st.write("Please select at least one emoji.")
     
-    # 显示已保存的故事
+    # Display saved stories
     if st.session_state.stories:
         st.markdown("---")
         st.header("Generated Stories")
         
-        # 按点赞数排序故事
         sorted_stories = sorted(st.session_state.stories, 
                               key=lambda x: x['votes'], 
                               reverse=True)
         
-        # 使用列布局显示故事和点赞按钮
         for idx, story_data in enumerate(sorted_stories):
             col1, col2 = st.columns([4, 1])
             with col1:
@@ -272,7 +267,7 @@ def main():
                     story_data['votes'] += 1
                     update_votes()
                     st.success("Liked!")
-                    st.experimental_rerun()
+                    st.rerun()
 
 if __name__ == "__main__":
     main()
