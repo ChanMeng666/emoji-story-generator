@@ -6,8 +6,16 @@
 </div>
 <br/>
 
-# Features
 Transform your emoji selections into engaging stories with our AI-powered story generator!
+
+
+https://github.com/user-attachments/assets/ecaf4494-7e51-4b86-9e79-7548957d0bcd
+
+
+![screencapture-huggingface-co-spaces-ChanMeng666-emoji-story-generator-2024-12-23-15_05_47](https://github.com/user-attachments/assets/4b48b701-7528-40c2-91af-9f9997abb822)
+
+
+# Features
 
 ### 🎨 Intuitive Emoji Selection
 Browse and select emojis from 8 categorized tabs including emotions, animals, food, activities and more. Simple click-to-add interface with a maximum of 5 emojis per story.
