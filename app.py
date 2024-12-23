@@ -8,8 +8,45 @@ import requests
 # 加载环境变量
 load_dotenv()
 
-# 定义表情列表
-EMOJI_LIST = ["😀", "😎", "🌞", "🌈", "🐶", "🏠", "🚀", "📚", "🎉", "🍕", "🎸", "🏆"]
+# 定义分类表情列表
+EMOJI_CATEGORIES = {
+    "表情与情绪": [
+        "😀", "😃", "😄", "😁", "😅", "😂", "🤣", "😊", "😇", "🙂", "😉", "😌", 
+        "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨",
+        "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁"
+    ],
+    "动物": [
+        "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮",
+        "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗"
+    ],
+    "植物": [
+        "🌸", "💮", "🌹", "🌺", "🌻", "🌼", "🌷", "🌱", "🌲", "🌳", "🌴", "🌵",
+        "🌾", "🌿", "☘️", "🍀", "🍁", "🍂", "🍃", "🪴", "🎋", "🎍"
+    ],
+    "食物": [
+        "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍈", "🍒", "🍑",
+        "🥭", "🍍", "🥥", "🥝", "🍅", "🍆", "🥑", "🥦", "🥬", "🥒", "🌶️", "🫑",
+        "🥕", "🧄", "🧅", "🥔", "🍠", "🥐", "🥯", "🍞", "🥖", "🥨", "🧀", "🥚",
+        "🍳", "🥓", "🥩", "🍗", "🍖", "🦴", "🌭", "🍔", "🍟", "🍕", "🫓", "🥪"
+    ],
+    "活动与运动": [
+        "⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱", "🪀", "🏓",
+        "🏸", "🏒", "🏑", "🥍", "🏏", "🪃", "🥅", "⛳", "🪁", "🏹", "🎣", "🤿"
+    ],
+    "交通工具": [
+        "🚗", "🚕", "🚙", "🚌", "🚎", "🏎️", "🚓", "🚑", "🚒", "🚐", "🛻", "🚚",
+        "🚛", "🚜", "🛵", "🏍️", "🚲", "🛴", "🚔", "🚍", "🚘", "🚖", "✈️", "🚀"
+    ],
+    "地点与建筑": [
+        "🏠", "🏡", "🏢", "🏣", "🏤", "🏥", "🏦", "🏨", "🏩", "🏪", "🏫", "🏬",
+        "🏭", "🏯", "🏰", "💒", "🗼", "🗽", "⛪", "🕌", "🕍", "⛩️", "🕋", "⛲"
+    ],
+    "物品与符号": [
+        "📱", "💻", "⌨️", "🖥️", "🖨️", "🖱️", "🖲️", "📷", "📸", "📹", "🎥", "📽️",
+        "📺", "📻", "🎙️", "🎚️", "🎛️", "🧭", "⏱️", "⏲️", "⏰", "🕰️", "📡", "🔋",
+        "📚", "📖", "🏆", "🎮", "🎲", "🎭", "🎨", "🎪", "🎟️", "🎫", "🎗️", "🏷️"
+    ]
+}
 
 # 定义数据文件路径
 DATA_FILE = "stories_data.json"
@@ -23,7 +60,6 @@ def query_huggingface(payload):
         "Content-Type": "application/json"
     }
     
-    # 调整payload格式为Zephyr模型的要求
     simplified_payload = {
         "inputs": payload["inputs"],
         "parameters": {
@@ -36,16 +72,13 @@ def query_huggingface(payload):
     }
     
     try:
-        st.write("Calling API...")
         response = requests.post(API_URL, headers=headers, json=simplified_payload, timeout=60)
         
         if response.status_code != 200:
             st.error(f"API call failed, status code: {response.status_code}")
-            st.write(f"Error message: {response.text}")
             return None
             
         result = response.json()
-        st.write("API response:", result)
         return result
             
     except Exception as e:
@@ -55,16 +88,24 @@ def query_huggingface(payload):
 def generate_story_with_ai(emojis):
     """Generate story using AI"""
     emoji_text = ' '.join(emojis)
-    prompt = f"""Create a fun and engaging short story using these emojis: {emoji_text}
+    prompt = f"""Create a short story (100-150 words) using these emojis: {emoji_text}
 
 Instructions:
-1. Create a story that naturally incorporates all the given emojis
-2. The story should be fun and suitable for all ages
-3. Include a clear beginning, middle, and end
-4. Keep it concise (around 100-150 words)
-5. Make it creative and engaging
+1. Write a coherent story that naturally incorporates the given emojis
+2. The story must be suitable for all ages and have a clear structure:
+   - Beginning: Introduce the main character and setting
+   - Middle: Present a small challenge or interesting situation
+   - End: Resolve the situation with a satisfying conclusion
+3. Important rules:
+   - Write as one continuous narrative without any section markers
+   - Do not use labels like 'Story event:' or 'Story resolution:'
+   - Ensure the story has a proper ending (no cliffhangers)
+   - Keep sentences complete (no trailing thoughts)
+   - Maintain a consistent tone throughout
+4. Example flow (do not copy this exactly):
+   "Character encounters situation → faces challenge → resolves it → learns or achieves something"
 
-Story beginning:
+Begin the story with:
 Once upon a sunny day,"""
     
     try:
@@ -72,22 +113,47 @@ Once upon a sunny day,"""
             response = query_huggingface({"inputs": prompt})
             
             if response and isinstance(response, list) and len(response) > 0:
-                # Get generated text
                 story = response[0].get('generated_text', '').strip()
-                
-                # Clean up story text
                 story = story.replace(prompt, '').strip()
                 
-                # Check if story is empty
                 if not story:
-                    st.error("Generated story is empty, please try again")
+                    st.error("Failed to generate story. Please try again.")
                     return None
                 
-                # Format final story
+                # 清理所有可能的章节标记和故事标签
+                markers_to_remove = [
+                    'Story event:', 'Story resolution:', 'Story middle:',
+                    'Story end:', 'Story summary:', 'Story continuation:',
+                    'Story ending:', 'Story begins:', 'Story continues:',
+                    'Story concludes:', 'Beginning:', 'Middle:', 'End:',
+                    'Continuation:', 'Ending:', 'Event:', 'Resolution:',
+                    'Finally:', 'In conclusion:', 'The end:', 'Summary:',
+                    'Next:', 'Then:', 'After that:', 'Eventually:'
+                ]
+                
+                # 移除所有标记
+                for marker in markers_to_remove:
+                    story = story.replace(marker, '')
+                
+                # 清理多余的空行和空格
+                story = '\n'.join(line for line in story.split('\n') if line.strip())
+                story = ' '.join(story.split())
+                
+                # 检查并修复不完整的结尾
+                incomplete_endings = ('and', 'but', 'or', 'so', 'while', 'as', 'then', 'when', '...')
+                while story.endswith(incomplete_endings) or story.rstrip()[-1] not in '.!?':
+                    story = story.rsplit(' ', 1)[0].rstrip()
+                    if not story:
+                        break
+                
+                # 确保故事有适当的结尾标点
+                if story and story[-1] not in '.!?':
+                    story += '.'
+                
                 final_story = f"Once upon a sunny day, {story}\n\n(Emojis used: {emoji_text})"
                 return final_story
             
-            st.error("Failed to generate story, please try again")
+            st.error("Failed to generate story. Please try again.")
             return None
             
     except Exception as e:
@@ -101,7 +167,7 @@ def load_stories():
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            st.error(f"加载数据时出错: {str(e)}")
+            st.error(f"Error loading data: {str(e)}")
             return []
     return []
 
@@ -111,7 +177,7 @@ def save_stories_to_file(stories):
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
             json.dump(stories, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        st.error(f"保存数据时出错: {str(e)}")
+        st.error(f"Error saving data: {str(e)}")
 
 # 初始化或加载故事数据
 if 'stories' not in st.session_state:
@@ -130,43 +196,83 @@ def main():
     st.set_page_config(page_title="Emoji Story Generator", page_icon="📚")
     st.title("Emoji Story Generator")
     
-    # Add emoji selector
-    selected_emojis = st.multiselect("Choose emojis for your story", EMOJI_LIST)
+    # 初始化session state来存储选中的emoji
+    if 'selected_emojis' not in st.session_state:
+        st.session_state.selected_emojis = []
     
-    if selected_emojis:
-        st.write("Selected emojis:", " ".join(selected_emojis))
+    # 创建选项卡布局
+    ENGLISH_CATEGORIES = {
+        "Faces & Emotions": EMOJI_CATEGORIES["表情与情绪"],
+        "Animals": EMOJI_CATEGORIES["动物"],
+        "Plants": EMOJI_CATEGORIES["植物"],
+        "Food": EMOJI_CATEGORIES["食物"],
+        "Activities & Sports": EMOJI_CATEGORIES["活动与运动"],
+        "Transportation": EMOJI_CATEGORIES["交通工具"],
+        "Places & Buildings": EMOJI_CATEGORIES["地点与建筑"],
+        "Objects & Symbols": EMOJI_CATEGORIES["物品与符号"]
+    }
+    
+    tabs = st.tabs(list(ENGLISH_CATEGORIES.keys()))
+    
+    # 在每个选项卡中显示对应类别的emoji
+    for tab, (category, emojis) in zip(tabs, ENGLISH_CATEGORIES.items()):
+        with tab:
+            st.write(f"Select {category}:")
+            # 将emoji列表分成多列显示
+            cols = st.columns(8)  # 每行8个emoji
+            for i, emoji in enumerate(emojis):
+                if cols[i % 8].button(emoji, key=f"{category}_{emoji}"):
+                    if emoji not in st.session_state.selected_emojis:
+                        if len(st.session_state.selected_emojis) < 5:  # 限制最多选择5个emoji
+                            st.session_state.selected_emojis.append(emoji)
+                        else:
+                            st.warning("Maximum 5 emojis allowed!")
+    
+    # 显示已选择的emoji
+    if st.session_state.selected_emojis:
+        st.write("---")
+        st.write("Selected emojis:", " ".join(st.session_state.selected_emojis))
         
-        # Add generate story button
-        if st.button("Generate Story"):
-            story = generate_story_with_ai(selected_emojis)
-            if story:  # Only save if story generation was successful
-                save_story(story)
-                st.write("Generated Story:")
-                st.write(story)
-                st.success("Story saved!")
-            
-        # Display saved stories
-        if st.session_state.stories:
-            st.header("Generated Stories")
-            
-            # Sort stories by votes
-            sorted_stories = sorted(st.session_state.stories, 
-                                 key=lambda x: x['votes'], 
-                                 reverse=True)
-            
-            # Use columns for layout
-            for idx, story_data in enumerate(sorted_stories):
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.write(f"{idx + 1}. {story_data['story']} (Likes: {story_data['votes']})")
-                with col2:
-                    if st.button(f"👍", key=f"vote_{idx}"):
-                        story_data['votes'] += 1
-                        update_votes()
-                        st.success(f"Liked!")
-                        st.experimental_rerun()
+        # 添加清除选择按钮
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("Clear Selection"):
+                st.session_state.selected_emojis = []
+                st.experimental_rerun()
+        
+        # 生成故事按钮
+        with col2:
+            if st.button("Generate Story"):
+                story = generate_story_with_ai(st.session_state.selected_emojis)
+                if story:
+                    save_story(story)
+                    st.write("Generated Story:")
+                    st.write(story)
+                    st.success("Story saved!")
     else:
         st.write("Please select at least one emoji.")
+    
+    # 显示已保存的故事
+    if st.session_state.stories:
+        st.markdown("---")
+        st.header("Generated Stories")
+        
+        # 按点赞数排序故事
+        sorted_stories = sorted(st.session_state.stories, 
+                              key=lambda x: x['votes'], 
+                              reverse=True)
+        
+        # 使用列布局显示故事和点赞按钮
+        for idx, story_data in enumerate(sorted_stories):
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.write(f"{idx + 1}. {story_data['story']} (Likes: {story_data['votes']})")
+            with col2:
+                if st.button(f"👍", key=f"vote_{idx}"):
+                    story_data['votes'] += 1
+                    update_votes()
+                    st.success("Liked!")
+                    st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
