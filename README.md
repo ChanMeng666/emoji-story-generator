@@ -8,6 +8,11 @@
 
 Transform your emoji selections into engaging stories with our AI-powered story generator!
 
+<br/>
+
+[![Explore GitHub Profile README Generator](https://gradient-svg-generator.vercel.app/?text=👉+Try+It+Now!+👈&height=40&template=pride-rainbow)](https://huggingface.co/spaces/ChanMeng666/emoji-story-generator)
+
+<br/>
 
 https://github.com/user-attachments/assets/ecaf4494-7e51-4b86-9e79-7548957d0bcd
 
