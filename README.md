@@ -840,6 +840,7 @@ While not required, attribution is appreciated when using this project as a base
 [github-forks-link]: https://github.com/ChanMeng666/emoji-story-generator/forks
 [github-contributors-link]: https://github.com/ChanMeng666/emoji-story-generator/contributors
 [github-release-link]: https://github.com/ChanMeng666/emoji-story-generator/releases
+[github-license-link]: https://github.com/ChanMeng666/emoji-story-generator/blob/main/LICENSE
 
 <!-- Shield Badges -->
 [github-release-shield]: https://img.shields.io/github/v/release/ChanMeng666/emoji-story-generator?color=369eff&labelColor=black&logo=github&style=flat-square
