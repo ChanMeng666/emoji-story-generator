@@ -1,6 +1,6 @@
 <div align="center"><a name="readme-top"></a>
 
-[![Project Banner](./public/emoji-story-generator.svg)](#)
+[![Project Banner](./public/emoji-story-generator-logo.svg)](#)
 
 # 🚀 Emoji Story Generator<br/><h3>AI-Powered Creative Storytelling Platform</h3>
 
@@ -318,7 +318,7 @@ emoji-story-generator/
 ├── stories_data.json         # Story persistence layer
 ├── .env                      # Environment configuration
 ├── public/
-│   └── emoji-story-generator.svg  # Project branding
+│   └── emoji-story-generator-logo.svg  # Project branding
 ├── README.md                 # Project documentation
 └── LICENSE                   # Open source license
 ```
