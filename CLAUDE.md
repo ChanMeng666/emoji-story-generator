@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Emoji Story Generator is a Streamlit-based web application that uses HuggingFace's Zephyr-7b-beta model to generate short stories from user-selected emojis. Users select up to 5 emojis from 8 categories (200+ emojis total), and the AI generates a 100-150 word family-friendly story incorporating those emojis.
+Emoji Story Generator is a Streamlit-based web application that uses HuggingFace's Inference Providers API with the meta-llama/Llama-3.1-8B-Instruct model to generate short stories from user-selected emojis. Users select up to 5 emojis from 8 categories (200+ emojis total), and the AI generates a 100-150 word family-friendly story incorporating those emojis.
 
 ## Development Commands
 
@@ -35,7 +35,7 @@ The entire application is contained in `app.py` with these key components:
 
 - **EMOJI_CATEGORIES**: Dictionary mapping category names (Chinese) to emoji lists
 - **ENGLISH_CATEGORIES**: English translations of category names for UI display
-- **query_huggingface()**: Makes POST requests to HuggingFace Inference API
+- **query_huggingface()**: Calls HuggingFace Inference Providers API via `huggingface_hub.InferenceClient.chat_completion()`
 - **generate_story_with_ai()**: Constructs prompt, calls API, cleans up generated story (removes section markers, fixes incomplete endings)
 - **load_stories()/save_stories_to_file()**: JSON file persistence for stories
 - **main()**: Streamlit UI with tabbed emoji categories, selection management, and story display
@@ -48,4 +48,5 @@ Data flow: User selects emojis -> Generate button triggers API call -> Response 
 - Stories persisted to `stories_data.json` with vote counts
 - Streamlit session state manages `selected_emojis` and `stories`
 - Story generation includes cleanup logic to remove AI section markers and fix incomplete sentences
-- API timeout set to 60 seconds; generation parameters: max_new_tokens=250, temperature=0.7, top_p=0.9
+- Generation parameters: max_tokens=250, temperature=0.7, top_p=0.9
+- Includes `<think>` tag stripping for models with reasoning output
