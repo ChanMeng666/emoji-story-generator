@@ -2,8 +2,9 @@ import streamlit as st
 import random
 import json
 import os
+import re
 from dotenv import load_dotenv
-import requests
+from huggingface_hub import InferenceClient
 
 # 加载环境变量
 load_dotenv()
@@ -51,36 +52,20 @@ EMOJI_CATEGORIES = {
 # 定义数据文件路径
 DATA_FILE = "stories_data.json"
 HUGGINGFACE_API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
-API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+MODEL_ID = "Qwen/Qwen3-4B"
 
-def query_huggingface(payload):
-    """调用Hugging Face API"""
-    headers = {
-        "Authorization": f"Bearer {HUGGINGFACE_API_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
-    simplified_payload = {
-        "inputs": payload["inputs"],
-        "parameters": {
-            "max_new_tokens": 250,
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "do_sample": True,
-            "return_full_text": False
-        }
-    }
-    
+def query_huggingface(prompt_text):
+    """调用Hugging Face Inference Providers API"""
     try:
-        response = requests.post(API_URL, headers=headers, json=simplified_payload, timeout=60)
-        
-        if response.status_code != 200:
-            st.error(f"API call failed, status code: {response.status_code}")
-            return None
-            
-        result = response.json()
-        return result
-            
+        client = InferenceClient(token=HUGGINGFACE_API_TOKEN)
+        response = client.chat_completion(
+            model=MODEL_ID,
+            messages=[{"role": "user", "content": prompt_text}],
+            max_tokens=250,
+            temperature=0.7,
+            top_p=0.9,
+        )
+        return response
     except Exception as e:
         st.error(f"API request error: {str(e)}")
         return None
@@ -110,12 +95,14 @@ Once upon a sunny day,"""
     
     try:
         with st.spinner('Creating story...'):
-            response = query_huggingface({"inputs": prompt})
-            
-            if response and isinstance(response, list) and len(response) > 0:
-                story = response[0].get('generated_text', '').strip()
-                story = story.replace(prompt, '').strip()
-                
+            response = query_huggingface(prompt)
+
+            if response and response.choices and len(response.choices) > 0:
+                story = response.choices[0].message.content.strip()
+
+                # Remove <think>...</think> reasoning blocks if present
+                story = re.sub(r'<think>.*?</think>', '', story, flags=re.DOTALL).strip()
+
                 if not story:
                     st.error("Failed to generate story. Please try again.")
                     return None
