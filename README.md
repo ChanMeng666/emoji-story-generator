@@ -5,7 +5,7 @@
 # 🚀 Emoji Story Generator<br/><h3>AI-Powered Creative Storytelling Platform</h3>
 
 An innovative storytelling application that leverages cutting-edge AI technology to transform emoji selections into engaging narratives.<br/>
-Supports 8 emoji categories with 200+ emojis, HuggingFace Zephyr-7b model integration, and a community-driven story library.<br/>
+Supports 8 emoji categories with 200+ emojis, HuggingFace Inference Providers API with Llama-3.1-8B-Instruct model, and a community-driven story library.<br/>
 One-click **FREE** deployment of your creative story generator.
 
 [🌟 Live Demo](https://huggingface.co/spaces/ChanMeng666/emoji-story-generator) · [📖 Documentation](#-getting-started) · [🐛 Issues](https://github.com/ChanMeng666/emoji-story-generator/issues) · [💡 Features](#-key-features)
@@ -89,7 +89,7 @@ https://github.com/user-attachments/assets/ecaf4494-7e51-4b86-9e79-7548957d0bcd
 </div>
 
 > [!IMPORTANT]
-> This project demonstrates modern AI integration with user-friendly interfaces. It combines Python's Streamlit framework with HuggingFace's state-of-the-art language models to provide creative storytelling capabilities. Features include emoji categorization, real-time story generation, community voting, and persistent story storage.
+> This project demonstrates modern AI integration with user-friendly interfaces. It combines Python's Streamlit framework with HuggingFace's Inference Providers API (using meta-llama/Llama-3.1-8B-Instruct) to provide creative storytelling capabilities. Features include emoji categorization, real-time story generation, community voting, and persistent story storage.
 
 <details>
 <summary><kbd>📑 Table of Contents</kbd></summary>
@@ -167,7 +167,7 @@ Whether you're an educator looking for engaging classroom activities, a parent s
 
 ### `1` AI-Powered Story Generation
 
-Experience cutting-edge storytelling with HuggingFace's Zephyr-7b model. Our sophisticated prompt engineering ensures that every generated story follows a clear narrative structure with compelling characters, engaging plots, and satisfying conclusions.
+Experience cutting-edge storytelling with Meta's Llama-3.1-8B-Instruct model via HuggingFace Inference Providers. Our sophisticated prompt engineering ensures that every generated story follows a clear narrative structure with compelling characters, engaging plots, and satisfying conclusions.
 
 **Advanced AI Capabilities:**
 - 🧠 **Intelligent Narrative Structure**: Automatic beginning-middle-end story construction
@@ -233,7 +233,7 @@ Beyond core story generation, the platform includes community and management fea
       </td>
       <td align="center" width="96">
         <img src="https://cdn.simpleicons.org/streamlit" width="48" height="48" alt="Streamlit" />
-        <br>Streamlit 1.22
+        <br>Streamlit
       </td>
       <td align="center" width="96">
         <img src="https://cdn.simpleicons.org/huggingface" width="48" height="48" alt="HuggingFace" />
@@ -252,11 +252,11 @@ Beyond core story generation, the platform includes community and management fea
 </div>
 
 **Core Technologies:**
-- **Framework**: Streamlit 1.22.0 for rapid web app development
-- **Language**: Python 3.7+ with modern async/await patterns
-- **AI Model**: HuggingFace Zephyr-7b-beta for story generation
-- **HTTP Client**: Requests 2.28.1 for reliable API communication
-- **Configuration**: Python-dotenv 0.19.2 for environment management
+- **Framework**: Streamlit for rapid web app development
+- **Language**: Python 3.7+
+- **AI Model**: meta-llama/Llama-3.1-8B-Instruct via HuggingFace Inference Providers
+- **API Client**: huggingface_hub InferenceClient for provider-routed inference
+- **Configuration**: Python-dotenv for environment management
 
 **Data & Storage:**
 - **Local Storage**: JSON file-based persistence for story data
@@ -293,8 +293,8 @@ graph TB
     end
     
     subgraph "External Services"
-        I[HuggingFace API]
-        J[Zephyr-7b Model]
+        I[HuggingFace Inference Providers]
+        J[Llama-3.1-8B-Instruct]
     end
     
     subgraph "Data Layer"
@@ -433,12 +433,13 @@ streamlit run app.py
 ### HuggingFace API Setup
 
 1. **Create Account**: Visit [HuggingFace](https://huggingface.co/) and create a free account
-2. **Generate Token**: Go to Settings → Access Tokens → New Token
-3. **Copy Token**: Copy the generated token
-4. **Set Environment**: Add token to `.env` file as shown above
+2. **Generate Token**: Go to Settings → Access Tokens → Create new token (Fine-grained)
+3. **Enable Permission**: Check "Make calls to Inference Providers" under Inference section
+4. **Copy Token**: Copy the generated token
+5. **Set Environment**: Add token to `.env` file as shown above
 
 > [!TIP]
-> Your HuggingFace token provides access to the Zephyr-7b model for story generation. Keep it secure and never commit it to version control.
+> Your HuggingFace token must have "Make calls to Inference Providers" permission enabled. Keep it secure and never commit it to version control.
 
 ## 🛳 Deployment
 
@@ -526,46 +527,31 @@ streamlit run app.py --server.runOnSave true
 For developers wanting to integrate the story generation functionality:
 
 ```python
-import requests
 import os
+from huggingface_hub import InferenceClient
 
 def generate_story(emojis, api_token):
-    """Generate story using HuggingFace API"""
-    
+    """Generate story using HuggingFace Inference Providers API"""
+
     emoji_text = ' '.join(emojis)
-    prompt = f"""Create a short story using these emojis: {emoji_text}
-    
+    prompt = f"""Create a short story (100-150 words) using these emojis: {emoji_text}
+
     Instructions:
-    1. Write a coherent story (100-150 words)
-    2. Include clear beginning, middle, and end
-    3. Make it family-friendly
-    4. Incorporate all provided emojis naturally
+    1. Write a coherent story with clear beginning, middle, and end
+    2. Make it family-friendly
+    3. Incorporate all provided emojis naturally
     """
-    
-    headers = {
-        "Authorization": f"Bearer {api_token}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 250,
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "do_sample": True,
-            "return_full_text": False
-        }
-    }
-    
-    response = requests.post(
-        "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta",
-        headers=headers,
-        json=payload,
-        timeout=60
+
+    client = InferenceClient(token=api_token)
+    response = client.chat_completion(
+        model="meta-llama/Llama-3.1-8B-Instruct",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=250,
+        temperature=0.7,
+        top_p=0.9,
     )
-    
-    return response.json()
+
+    return response.choices[0].message.content
 
 # Example usage
 story = generate_story(["😊", "🐶", "🏠"], os.getenv("HUGGINGFACE_API_TOKEN"))
@@ -577,7 +563,7 @@ Current integrations and future roadmap:
 
 | Integration | Status | Description | Documentation |
 |-------------|--------|-------------|---------------|
-| **HuggingFace API** | ✅ Active | Zephyr-7b model for story generation | [HF Docs](https://huggingface.co/docs/api-inference/) |
+| **HuggingFace Inference Providers** | ✅ Active | Llama-3.1-8B-Instruct for story generation | [HF Docs](https://huggingface.co/docs/inference-providers/) |
 | **Streamlit Cloud** | ✅ Active | Free cloud deployment platform | [Deploy Guide](#deployment) |
 | **JSON Storage** | ✅ Active | Local file-based story persistence | Built-in |
 | **Environment Config** | ✅ Active | Secure API key management | [Setup Guide](#environment-configuration) |
@@ -632,7 +618,7 @@ git add . && git commit -m "Update"     # Version control
 
 **Main Application (`app.py`):**
 - 🎯 **Emoji Categories**: 8 categories with 200+ emojis
-- 🤖 **AI Integration**: HuggingFace API communication
+- 🤖 **AI Integration**: HuggingFace Inference Providers API via huggingface_hub
 - 💾 **Data Management**: JSON-based story persistence
 - 🎨 **UI Components**: Streamlit interface components
 - 🗳️ **Voting System**: Community engagement features
@@ -671,12 +657,13 @@ def format_story(story, emojis):
 
 ```python
 # Modify generation parameters in query_huggingface()
-"parameters": {
-    "max_new_tokens": 300,      # Longer stories
-    "temperature": 0.8,         # More creativity
-    "top_p": 0.95,             # Better coherence
-    "repetition_penalty": 1.1   # Reduce repetition
-}
+response = client.chat_completion(
+    model=MODEL_ID,
+    messages=[{"role": "user", "content": prompt_text}],
+    max_tokens=300,        # Longer stories
+    temperature=0.8,       # More creativity
+    top_p=0.95,           # Better coherence
+)
 ```
 
 ## 🤝 Contributing
@@ -845,8 +832,8 @@ While not required, attribution is appreciated when using this project as a base
 <!-- Shield Badges -->
 [github-release-shield]: https://img.shields.io/github/v/release/ChanMeng666/emoji-story-generator?color=369eff&labelColor=black&logo=github&style=flat-square
 [python-shield]: https://img.shields.io/badge/Python-3.7+-blue.svg?style=flat-square&logo=python&logoColor=white
-[streamlit-shield]: https://img.shields.io/badge/Streamlit-1.22.0-FF4B4B.svg?style=flat-square&logo=streamlit&logoColor=white
-[huggingface-shield]: https://img.shields.io/badge/HuggingFace-Zephyr--7b-FFD21E.svg?style=flat-square&logo=huggingface&logoColor=black
+[streamlit-shield]: https://img.shields.io/badge/Streamlit-latest-FF4B4B.svg?style=flat-square&logo=streamlit&logoColor=white
+[huggingface-shield]: https://img.shields.io/badge/HuggingFace-Llama--3.1--8B-FFD21E.svg?style=flat-square&logo=huggingface&logoColor=black
 [github-contributors-shield]: https://img.shields.io/github/contributors/ChanMeng666/emoji-story-generator?color=c4f042&labelColor=black&style=flat-square
 [github-forks-shield]: https://img.shields.io/github/forks/ChanMeng666/emoji-story-generator?color=8ae8ff&labelColor=black&style=flat-square
 [github-stars-shield]: https://img.shields.io/github/stars/ChanMeng666/emoji-story-generator?color=ffcb47&labelColor=black&style=flat-square
