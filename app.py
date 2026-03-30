@@ -52,7 +52,7 @@ EMOJI_CATEGORIES = {
 # 定义数据文件路径
 DATA_FILE = "stories_data.json"
 HUGGINGFACE_API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
-MODEL_ID = "Qwen/Qwen3-4B"
+MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
 
 def query_huggingface(prompt_text):
     """调用Hugging Face Inference Providers API"""
