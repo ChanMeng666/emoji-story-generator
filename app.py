@@ -369,7 +369,8 @@ ENGLISH_CATEGORIES = {
 def get_db():
     """Initialize and return a persistent database connection."""
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA journal_mode=DELETE")
+    conn.execute("PRAGMA mmap_size=0")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS stories (
