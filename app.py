@@ -15,21 +15,11 @@ load_dotenv()
 # ============================================================
 # Configuration
 # ============================================================
-def _get_persistent_dir():
-    """Find a writable persistent directory."""
-    if os.path.exists("/data"):
-        try:
-            test_file = "/data/.write_test"
-            with open(test_file, "w") as f:
-                f.write("ok")
-            os.remove(test_file)
-            return "/data"
-        except OSError:
-            pass
-    return "."
-
-PERSISTENT_DIR = _get_persistent_dir()
-DB_PATH = os.path.join(PERSISTENT_DIR, "stories.db")
+# SQLite lives locally (FUSE mounts like /data don't support SQLite locking).
+# Persistent backup is kept as JSON in /data for survival across restarts.
+BACKUP_DIR = "/data" if os.path.exists("/data") else None
+BACKUP_PATH = os.path.join(BACKUP_DIR, "stories_backup.json") if BACKUP_DIR else None
+DB_PATH = "stories.db"
 HUGGINGFACE_API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
 MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
 STORIES_PER_PAGE = 8
@@ -382,8 +372,6 @@ ENGLISH_CATEGORIES = {
 def get_db():
     """Initialize and return a persistent database connection."""
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=DELETE")
-    conn.execute("PRAGMA mmap_size=0")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS stories (
@@ -408,52 +396,94 @@ def get_db():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stories_created ON stories(created_at)")
     conn.commit()
 
-    # Auto-migrate from legacy stories_data.json if it exists and DB is empty
-    _migrate_from_json(conn)
+    # Restore data from persistent backup (survives container restarts)
+    _restore_from_backup(conn)
 
     return conn
 
 
-def _migrate_from_json(conn):
-    """One-time migration: import stories from legacy stories_data.json into SQLite."""
-    json_path = os.path.join(os.path.dirname(__file__), "stories_data.json")
-    if not os.path.exists(json_path):
+def _backup_to_json():
+    """Save all stories and votes to a JSON file in /data for persistence."""
+    if not BACKUP_PATH:
         return
+    try:
+        conn = get_db()
+        stories = conn.execute(
+            "SELECT id, story, emojis, created_at, session_id FROM stories"
+        ).fetchall()
+        votes = conn.execute(
+            "SELECT story_id, session_id, vote_type FROM votes"
+        ).fetchall()
+        data = {
+            "stories": [
+                {"id": r[0], "story": r[1], "emojis": r[2], "created_at": r[3], "session_id": r[4]}
+                for r in stories
+            ],
+            "votes": [
+                {"story_id": r[0], "session_id": r[1], "vote_type": r[2]}
+                for r in votes
+            ]
+        }
+        with open(BACKUP_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception:
+        pass
 
-    # Only migrate if DB has no stories yet
+
+def _restore_from_backup(conn):
+    """Restore stories and votes from the persistent JSON backup."""
+    # First try persistent backup
+    source = BACKUP_PATH
+    # Fallback to legacy stories_data.json
+    if not source or not os.path.exists(source):
+        legacy = os.path.join(os.path.dirname(__file__), "stories_data.json")
+        if os.path.exists(legacy):
+            source = legacy
+        else:
+            return
+
     count = conn.execute("SELECT COUNT(*) FROM stories").fetchone()[0]
     if count > 0:
         return
 
     try:
-        with open(json_path, "r", encoding="utf-8") as f:
-            old_stories = json.load(f)
+        with open(source, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-        for item in old_stories:
-            story_text = item.get("story", "")
-            votes = item.get("votes", 0)
-
-            # Extract emojis from the "(Emojis used: ...)" suffix
-            emojis = ""
-            match = re.search(r'\(Emojis used:\s*(.+?)\)', story_text)
-            if match:
-                emojis = match.group(1).strip()
-
-            cursor = conn.execute(
-                "INSERT INTO stories (story, emojis, session_id) VALUES (?, ?, ?)",
-                (story_text, emojis, "migrated")
-            )
-            # Recreate legacy vote counts as anonymous votes
-            story_id = cursor.lastrowid
-            for i in range(votes):
+        # Handle new backup format
+        if isinstance(data, dict) and "stories" in data:
+            for item in data["stories"]:
+                conn.execute(
+                    "INSERT INTO stories (id, story, emojis, created_at, session_id) VALUES (?, ?, ?, ?, ?)",
+                    (item["id"], item["story"], item["emojis"], item.get("created_at"), item.get("session_id"))
+                )
+            for vote in data.get("votes", []):
                 conn.execute(
                     "INSERT OR IGNORE INTO votes (story_id, session_id, vote_type) VALUES (?, ?, ?)",
-                    (story_id, f"legacy_vote_{i}", "like")
+                    (vote["story_id"], vote["session_id"], vote["vote_type"])
                 )
-
+        # Handle legacy format (list of {story, votes})
+        elif isinstance(data, list):
+            for item in data:
+                story_text = item.get("story", "")
+                votes = item.get("votes", 0)
+                emojis = ""
+                match = re.search(r'\(Emojis used:\s*(.+?)\)', story_text)
+                if match:
+                    emojis = match.group(1).strip()
+                cursor = conn.execute(
+                    "INSERT INTO stories (story, emojis, session_id) VALUES (?, ?, ?)",
+                    (story_text, emojis, "migrated")
+                )
+                story_id = cursor.lastrowid
+                for i in range(votes):
+                    conn.execute(
+                        "INSERT OR IGNORE INTO votes (story_id, session_id, vote_type) VALUES (?, ?, ?)",
+                        (story_id, f"legacy_vote_{i}", "like")
+                    )
         conn.commit()
     except Exception:
-        pass  # Silently skip migration errors
+        pass
 
 
 def add_story(story_text, emojis, session_id):
@@ -464,6 +494,7 @@ def add_story(story_text, emojis, session_id):
         (story_text, emojis, session_id)
     )
     conn.commit()
+    _backup_to_json()
     return cursor.lastrowid
 
 
@@ -538,6 +569,7 @@ def toggle_vote(story_id, session_id, vote_type="like"):
     if existing:
         conn.execute("DELETE FROM votes WHERE id = ?", (existing[0],))
         conn.commit()
+        _backup_to_json()
         return False
     else:
         conn.execute(
@@ -545,6 +577,7 @@ def toggle_vote(story_id, session_id, vote_type="like"):
             (story_id, session_id, vote_type)
         )
         conn.commit()
+        _backup_to_json()
         return True
 
 
@@ -556,6 +589,7 @@ def delete_story(story_id, session_id):
         (story_id, session_id)
     )
     conn.commit()
+    _backup_to_json()
 
 
 # ============================================================
