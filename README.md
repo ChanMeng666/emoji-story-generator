@@ -1,3 +1,16 @@
+---
+title: Emoji Story Generator
+emoji: 📚
+colorFrom: purple
+colorTo: yellow
+sdk: streamlit
+sdk_version: "1.41.1"
+app_file: app.py
+pinned: false
+license: mit
+short_description: AI-powered emoji story generator with voting system
+---
+
 <div align="center"><a name="readme-top"></a>
 
 [![Project Banner](./public/emoji-story-generator-logo.svg)](#)
