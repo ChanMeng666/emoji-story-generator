@@ -15,7 +15,20 @@ load_dotenv()
 # ============================================================
 # Configuration
 # ============================================================
-PERSISTENT_DIR = "/data" if os.path.exists("/data") else "."
+def _get_persistent_dir():
+    """Find a writable persistent directory."""
+    if os.path.exists("/data"):
+        try:
+            test_file = "/data/.write_test"
+            with open(test_file, "w") as f:
+                f.write("ok")
+            os.remove(test_file)
+            return "/data"
+        except OSError:
+            pass
+    return "."
+
+PERSISTENT_DIR = _get_persistent_dir()
 DB_PATH = os.path.join(PERSISTENT_DIR, "stories.db")
 HUGGINGFACE_API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
 MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
