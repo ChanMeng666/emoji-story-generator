@@ -29,24 +29,60 @@ Requires a `.env` file with:
 HUGGINGFACE_API_TOKEN=your_token_here
 ```
 
+On HuggingFace Spaces, enable **Persistent Storage** in Space settings to make the `/data` directory available for SQLite database persistence.
+
 ## Architecture
 
-The entire application is contained in `app.py` with these key components:
+The entire application is contained in `app.py` with these key sections:
 
-- **EMOJI_CATEGORIES**: Dictionary mapping category names (Chinese) to emoji lists
-- **ENGLISH_CATEGORIES**: English translations of category names for UI display
+### Configuration & CSS
+- **CUSTOM_CSS**: Full custom CSS theme injected via `st.markdown()` with `unsafe_allow_html=True`
+- **EMOJI_CATEGORIES / ENGLISH_CATEGORIES**: 8 categories with 238+ emojis, Chinese internal names with English display labels (include category icons)
+
+### Database Layer (SQLite)
+- **get_db()**: Cached database connection with WAL mode, creates tables on first run
+- **add_story()**: Inserts story with emojis, timestamp, and session_id
+- **get_stories()**: Paginated query with sort (popular/newest/oldest) and search support
+- **get_vote_counts() / get_user_votes()**: Vote aggregation by type and per-user tracking
+- **toggle_vote()**: Adds or removes a vote (like/love/star) with UNIQUE constraint deduplication
+- **delete_story()**: Session-scoped deletion (only creator can delete)
+
+Database path: `/data/stories.db` on HF Spaces, `./stories.db` locally.
+
+Schema:
+- `stories` table: id, story, emojis, created_at, session_id
+- `votes` table: id, story_id, session_id, vote_type, created_at (UNIQUE on story_id + session_id + vote_type)
+
+### AI Story Generation
 - **query_huggingface()**: Calls HuggingFace Inference Providers API via `huggingface_hub.InferenceClient.chat_completion()`
-- **generate_story_with_ai()**: Constructs prompt, calls API, cleans up generated story (removes section markers, fixes incomplete endings)
-- **load_stories()/save_stories_to_file()**: JSON file persistence for stories
-- **main()**: Streamlit UI with tabbed emoji categories, selection management, and story display
+- **generate_story_with_ai()**: Constructs prompt, calls API, cleans up generated story (removes section markers, `<think>` tags, fixes incomplete endings)
+- Generation parameters: max_tokens=250, temperature=0.7, top_p=0.9
 
-Data flow: User selects emojis -> Generate button triggers API call -> Response is cleaned and formatted -> Story saved to `stories_data.json` -> Displayed in UI with voting capability
+### UI Helpers
+- **render_header()**: Custom header with base64-embedded SVG logo from `public/`
+- **render_emoji_tray()**: Visual chip-based display of selected emojis with counter
+- **render_story_card()**: Card layout with story text, metadata, 3 reaction types, copy/share, and delete (creator only)
+- **relative_time()**: Converts timestamps to human-readable relative time
+
+### Main Application Flow
+1. Session ID generated per browser session (UUID) for vote tracking and story ownership
+2. Tabbed emoji picker → selected emoji tray → generate button
+3. Stories section with sort dropdown + search input
+4. Paginated story cards (8 per page) with reaction buttons
+5. Copy-to-clipboard and session-scoped delete functionality
+
+Data flow: User selects emojis → Generate button → HF API call → Response cleaned → Saved to SQLite → Displayed as styled card with reactions
 
 ## Key Implementation Details
 
 - Maximum 5 emojis per story selection
-- Stories persisted to `stories_data.json` with vote counts
-- Streamlit session state manages `selected_emojis` and `stories`
-- Story generation includes cleanup logic to remove AI section markers and fix incomplete sentences
-- Generation parameters: max_tokens=250, temperature=0.7, top_p=0.9
-- Includes `<think>` tag stripping for models with reasoning output
+- SQLite with WAL mode for concurrent access safety
+- Session-based vote deduplication (UUID per browser session, UNIQUE constraint in DB)
+- Three reaction types: like, love, star (toggleable)
+- Pagination: 8 stories per page with Previous/Next navigation
+- Search filters stories by content or emojis
+- Sort options: Most Popular, Newest First, Oldest First
+- Story creators can delete their own stories (session_id match)
+- Custom CSS provides professional UI with gradient theme, card layout, hover effects
+- Logo embedded as base64 SVG from `public/emoji-story-generator-logo.svg`
+- No additional dependencies beyond standard library (`sqlite3`, `uuid`, `datetime`, `base64`)
