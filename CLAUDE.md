@@ -29,7 +29,7 @@ Requires a `.env` file with:
 HUGGINGFACE_API_TOKEN=your_token_here
 ```
 
-On HuggingFace Spaces, enable **Persistent Storage** in Space settings to make the `/data` directory available for SQLite database persistence.
+On HuggingFace Spaces, mount a **Storage Bucket** at `/data` (Read & Write) in Space settings for persistent data backup across container restarts.
 
 ## Architecture
 
@@ -39,15 +39,21 @@ The entire application is contained in `app.py` with these key sections:
 - **CUSTOM_CSS**: Full custom CSS theme injected via `st.markdown()` with `unsafe_allow_html=True`
 - **EMOJI_CATEGORIES / ENGLISH_CATEGORIES**: 8 categories with 238+ emojis, Chinese internal names with English display labels (include category icons)
 
-### Database Layer (SQLite)
-- **get_db()**: Cached database connection with WAL mode, creates tables on first run
-- **add_story()**: Inserts story with emojis, timestamp, and session_id
+### Data Persistence (SQLite + JSON Backup)
+
+**Primary storage**: Local SQLite database (`stories.db` in container working directory). HF Storage Buckets use FUSE (S3-backed) which does not support SQLite file locking, so the DB must live on the local filesystem.
+
+**Persistent backup**: After every write operation, a full JSON snapshot is saved to `/data/stories_backup.json` (the mounted Storage Bucket). On container startup, if the local SQLite DB is empty, data is restored from this backup.
+
+Functions:
+- **get_db()**: Cached database connection (`@st.cache_resource`), creates tables on first run, restores from backup
+- **_backup_to_json()**: Dumps all stories + votes to `/data/stories_backup.json`
+- **_restore_from_backup()**: Loads stories + votes from JSON backup into empty SQLite DB
+- **add_story()**: Inserts story with emojis, timestamp, and session_id; triggers backup
 - **get_stories()**: Paginated query with sort (popular/newest/oldest) and search support
 - **get_vote_counts() / get_user_votes()**: Vote aggregation by type and per-user tracking
-- **toggle_vote()**: Adds or removes a vote (like/love/star) with UNIQUE constraint deduplication
-- **delete_story()**: Session-scoped deletion (only creator can delete)
-
-Database path: `/data/stories.db` on HF Spaces, `./stories.db` locally.
+- **toggle_vote()**: Adds or removes a vote (like/love/star) with UNIQUE constraint; triggers backup
+- **delete_story()**: Session-scoped deletion (only creator can delete); triggers backup
 
 Schema:
 - `stories` table: id, story, emojis, created_at, session_id
@@ -71,12 +77,12 @@ Schema:
 4. Paginated story cards (8 per page) with reaction buttons
 5. Copy-to-clipboard and session-scoped delete functionality
 
-Data flow: User selects emojis → Generate button → HF API call → Response cleaned → Saved to SQLite → Displayed as styled card with reactions
+Data flow: User selects emojis → Generate button → HF API call → Response cleaned → Saved to SQLite + JSON backup → Displayed as styled card with reactions
 
 ## Key Implementation Details
 
 - Maximum 5 emojis per story selection
-- SQLite with WAL mode for concurrent access safety
+- SQLite for fast local queries; JSON backup in `/data` for persistence across restarts
 - Session-based vote deduplication (UUID per browser session, UNIQUE constraint in DB)
 - Three reaction types: like, love, star (toggleable)
 - Pagination: 8 stories per page with Previous/Next navigation

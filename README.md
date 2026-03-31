@@ -253,8 +253,8 @@ Beyond core story generation, the platform includes community and management fea
         <br>HuggingFace API
       </td>
       <td align="center" width="96">
-        <img src="https://cdn.simpleicons.org/json" width="48" height="48" alt="JSON" />
-        <br>JSON Storage
+        <img src="https://cdn.simpleicons.org/sqlite" width="48" height="48" alt="SQLite" />
+        <br>SQLite + JSON Backup
       </td>
       <td align="center" width="96">
         <img src="https://cdn.simpleicons.org/dotenv" width="48" height="48" alt="Python dotenv" />
@@ -272,7 +272,7 @@ Beyond core story generation, the platform includes community and management fea
 - **Configuration**: Python-dotenv for environment management
 
 **Data & Storage:**
-- **Local Storage**: JSON file-based persistence for story data
+- **Local Storage**: SQLite database for queries, JSON backup in `/data` for persistence across restarts
 - **Session Management**: Streamlit session state for user interactions
 - **Configuration**: Environment variables for secure API key management
 
@@ -311,7 +311,7 @@ graph TB
     end
     
     subgraph "Data Layer"
-        K[JSON Storage]
+        K[SQLite + JSON Backup]
         L[Environment Config]
     end
     
@@ -578,7 +578,7 @@ Current integrations and future roadmap:
 |-------------|--------|-------------|---------------|
 | **HuggingFace Inference Providers** | ✅ Active | Llama-3.1-8B-Instruct for story generation | [HF Docs](https://huggingface.co/docs/inference-providers/) |
 | **Streamlit Cloud** | ✅ Active | Free cloud deployment platform | [Deploy Guide](#deployment) |
-| **JSON Storage** | ✅ Active | Local file-based story persistence | Built-in |
+| **SQLite + JSON Backup** | ✅ Active | Local SQLite for queries, JSON backup for persistence | Built-in |
 | **Environment Config** | ✅ Active | Secure API key management | [Setup Guide](#environment-configuration) |
 | **Google Analytics** | 🔶 Planned | Usage analytics and insights | Coming Soon |
 | **User Authentication** | 🔶 Planned | Personal story libraries | Coming Soon |

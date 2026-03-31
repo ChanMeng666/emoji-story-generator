@@ -5,7 +5,7 @@ import json
 import os
 import re
 import base64
-from datetime import datetime, timezone
+from datetime import datetime
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 
@@ -431,56 +431,31 @@ def _backup_to_json():
 
 
 def _restore_from_backup(conn):
-    """Restore stories and votes from the persistent JSON backup."""
-    # First try persistent backup
-    source = BACKUP_PATH
-    # Fallback to legacy stories_data.json
-    if not source or not os.path.exists(source):
-        legacy = os.path.join(os.path.dirname(__file__), "stories_data.json")
-        if os.path.exists(legacy):
-            source = legacy
-        else:
-            return
+    """Restore stories and votes from the persistent JSON backup on startup."""
+    if not BACKUP_PATH or not os.path.exists(BACKUP_PATH):
+        return
 
     count = conn.execute("SELECT COUNT(*) FROM stories").fetchone()[0]
     if count > 0:
         return
 
     try:
-        with open(source, "r", encoding="utf-8") as f:
+        with open(BACKUP_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Handle new backup format
-        if isinstance(data, dict) and "stories" in data:
-            for item in data["stories"]:
-                conn.execute(
-                    "INSERT INTO stories (id, story, emojis, created_at, session_id) VALUES (?, ?, ?, ?, ?)",
-                    (item["id"], item["story"], item["emojis"], item.get("created_at"), item.get("session_id"))
-                )
-            for vote in data.get("votes", []):
-                conn.execute(
-                    "INSERT OR IGNORE INTO votes (story_id, session_id, vote_type) VALUES (?, ?, ?)",
-                    (vote["story_id"], vote["session_id"], vote["vote_type"])
-                )
-        # Handle legacy format (list of {story, votes})
-        elif isinstance(data, list):
-            for item in data:
-                story_text = item.get("story", "")
-                votes = item.get("votes", 0)
-                emojis = ""
-                match = re.search(r'\(Emojis used:\s*(.+?)\)', story_text)
-                if match:
-                    emojis = match.group(1).strip()
-                cursor = conn.execute(
-                    "INSERT INTO stories (story, emojis, session_id) VALUES (?, ?, ?)",
-                    (story_text, emojis, "migrated")
-                )
-                story_id = cursor.lastrowid
-                for i in range(votes):
-                    conn.execute(
-                        "INSERT OR IGNORE INTO votes (story_id, session_id, vote_type) VALUES (?, ?, ?)",
-                        (story_id, f"legacy_vote_{i}", "like")
-                    )
+        if not isinstance(data, dict) or "stories" not in data:
+            return
+
+        for item in data["stories"]:
+            conn.execute(
+                "INSERT INTO stories (id, story, emojis, created_at, session_id) VALUES (?, ?, ?, ?, ?)",
+                (item["id"], item["story"], item["emojis"], item.get("created_at"), item.get("session_id"))
+            )
+        for vote in data.get("votes", []):
+            conn.execute(
+                "INSERT OR IGNORE INTO votes (story_id, session_id, vote_type) VALUES (?, ?, ?)",
+                (vote["story_id"], vote["session_id"], vote["vote_type"])
+            )
         conn.commit()
     except Exception:
         pass
