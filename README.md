@@ -102,7 +102,7 @@ https://github.com/user-attachments/assets/ecaf4494-7e51-4b86-9e79-7548957d0bcd
 </div>
 
 > [!IMPORTANT]
-> This project demonstrates modern AI integration with user-friendly interfaces. It combines Python's Streamlit framework with HuggingFace's Inference Providers API (using meta-llama/Llama-3.1-8B-Instruct) to provide creative storytelling capabilities. Features include emoji categorization, real-time story generation, community voting, and persistent story storage.
+> This project demonstrates modern AI integration with user-friendly interfaces. It combines Python's Streamlit framework with HuggingFace's Inference Providers API (using meta-llama/Llama-3.1-8B-Instruct) to provide creative storytelling capabilities. Features include emoji categorization, real-time story generation, three reaction types (like/love/star) with session-based deduplication, search & sort & pagination, professional custom-CSS UI with gradient theme, and persistent data storage via SQLite + JSON backup.
 
 <details>
 <summary><kbd>📑 Table of Contents</kbd></summary>
@@ -216,14 +216,21 @@ Navigate through our carefully curated collection of 200+ emojis organized into 
 
 ### `*` Additional Features
 
-Beyond core story generation, the platform includes community and management features:
+Beyond core story generation, the platform includes community, management, and professional UI features:
 
-- [x] 💾 **Automatic Story Persistence**: All generated stories are automatically saved
-- [x] 🗳️ **Community Voting System**: Like and promote your favorite stories
-- [x] 📊 **Story Ranking**: Popular stories rise to the top based on community votes
-- [x] 🎨 **Clean Interface**: Minimalist design focused on creativity
-- [x] ⚡ **Real-time Generation**: Fast story creation with visual feedback
-- [x] 🔄 **Session Management**: Maintain selections and state across interactions
+- [x] 💾 **Persistent Storage**: SQLite for fast queries + JSON backup in `/data` for HF Spaces persistence across restarts
+- [x] 👍❤️⭐ **Three Reaction Types**: Like, Love, and Star reactions with toggle support
+- [x] 🛡️ **Vote Deduplication**: Session-based UUID + database UNIQUE constraint prevents duplicate votes
+- [x] 🔍 **Search & Filter**: Search stories by content or emojis
+- [x] 📊 **Sort Options**: Most Popular, Newest First, Oldest First
+- [x] 📄 **Pagination**: 8 stories per page with Previous/Next navigation
+- [x] 📋 **Copy to Clipboard**: One-click story copying for sharing
+- [x] 🗑️ **Session-Scoped Deletion**: Creators can delete their own stories
+- [x] ↩️ **Undo Selection**: Remove last selected emoji or clear all
+- [x] 🕐 **Relative Timestamps**: Human-readable time display ("2h ago")
+- [x] 🎨 **Custom CSS Theme**: Gradient colors, card layouts, hover animations, styled buttons
+- [x] 🖼️ **Embedded Logo**: Base64-encoded SVG logo in custom header
+- [x] 🌗 **Dark/Light Theme**: CSS media query support for both themes
 - [x] 📱 **Mobile Responsive**: Optimized for all screen sizes
 - [x] 🌐 **Web-Based**: No installation required, accessible anywhere
 
@@ -326,14 +333,28 @@ graph TB
 
 ```
 emoji-story-generator/
-├── app.py                     # Main Streamlit application
-├── requirements.txt           # Python dependencies
-├── stories_data.json         # Story persistence layer
-├── .env                      # Environment configuration
+├── app.py                     # Main application (~950 lines)
+│                              #   ├── CUSTOM_CSS          - Full CSS theme
+│                              #   ├── EMOJI_CATEGORIES    - 8 categories, 238+ emojis
+│                              #   ├── Database Layer       - SQLite + JSON backup/restore
+│                              #   ├── AI Generation        - HF Inference Providers API
+│                              #   ├── UI Helpers           - Header, emoji tray, story cards
+│                              #   └── main()               - Streamlit app entry point
+├── requirements.txt           # Python dependencies (streamlit, python-dotenv, huggingface_hub)
+├── .env                       # Environment configuration (HUGGINGFACE_API_TOKEN)
 ├── public/
-│   └── emoji-story-generator-logo.svg  # Project branding
-├── README.md                 # Project documentation
-└── LICENSE                   # Open source license
+│   ├── emoji-story-generator-logo.svg   # Project logo (embedded as base64 in header)
+│   └── emoji-story-generator.svg        # Additional SVG asset
+├── CLAUDE.md                  # AI assistant guidance for codebase
+├── README.md                  # Project documentation
+├── CODE_OF_CONDUCT.md         # Community guidelines
+└── LICENSE                    # MIT license
+```
+
+**Runtime files (not committed):**
+```
+stories.db                     # Local SQLite database (gitignored)
+/data/stories_backup.json      # Persistent JSON backup on HF Spaces Storage Bucket
 ```
 
 ### Data Flow
@@ -344,21 +365,28 @@ sequenceDiagram
     participant S as Streamlit UI
     participant A as App Logic
     participant H as HuggingFace API
-    participant D as Data Store
-    
-    U->>S: Select Emojis
-    S->>A: Process Selection
-    U->>S: Generate Story
+    participant DB as SQLite
+    participant B as /data Backup
+
+    Note over DB,B: On startup: restore from backup if DB is empty
+    B-->>DB: _restore_from_backup()
+
+    U->>S: Select Emojis (up to 5)
+    U->>S: Click "Generate Story"
     S->>A: Trigger Generation
     A->>H: Send Prompt + Emojis
     H->>A: Return Generated Story
-    A->>D: Save Story + Metadata
-    A->>S: Display Story
-    S->>U: Show Results
-    
-    U->>S: Vote on Story
-    S->>A: Update Vote Count
-    A->>D: Persist Vote Data
+    A->>A: Clean response (strip markers, fix endings)
+    A->>DB: INSERT story (SQLite)
+    A->>B: _backup_to_json()
+    A->>S: Display Story Card
+    S->>U: Show Result with Reactions
+
+    U->>S: Click Reaction (👍/❤️/⭐)
+    S->>A: toggle_vote(story_id, session_id, type)
+    A->>DB: INSERT or DELETE vote (UNIQUE constraint)
+    A->>B: _backup_to_json()
+    S->>U: Update Reaction Count
 ```
 
 ## ⚡️ Performance
@@ -368,20 +396,22 @@ sequenceDiagram
 **Response Times:**
 - ⚡ **Emoji Selection**: < 100ms instant response
 - 🤖 **AI Story Generation**: 15-30 seconds (depends on HuggingFace API)
-- 💾 **Story Saving**: < 200ms local JSON write
-- 🗳️ **Voting Updates**: < 150ms real-time updates
+- 💾 **Story Saving**: < 50ms SQLite write + async JSON backup
+- 🗳️ **Voting Updates**: < 50ms SQLite toggle + backup
 
 **Scalability Features:**
 - 📊 **Efficient State Management**: Streamlit session state optimization
-- 🔄 **Smart Caching**: Automatic emoji category caching
-- 📱 **Responsive Design**: Optimized for all device sizes
+- 🔄 **Smart Caching**: `@st.cache_resource` for database connection
+- 📱 **Responsive Design**: Custom CSS with mobile breakpoints
 - 🚀 **Fast Loading**: Minimal dependencies for quick startup
+- 📄 **Paginated Queries**: SQLite LIMIT/OFFSET prevents loading all stories at once
 
 **Reliability Metrics:**
 - 🛡️ **Error Handling**: Comprehensive API error management
-- 🔄 **Retry Logic**: Automatic retry for failed API calls
-- 💾 **Data Integrity**: Safe JSON file operations with error recovery
+- 💾 **Data Integrity**: SQLite ACID transactions + JSON backup to persistent storage
+- 🔒 **Vote Deduplication**: UNIQUE constraint prevents duplicate votes per session
 - ⚠️ **User Feedback**: Clear error messages and loading indicators
+- 🔄 **Auto-Restore**: Data automatically restored from backup on container restart
 
 > [!NOTE]
 > Performance metrics may vary based on HuggingFace API availability and network conditions.
@@ -463,10 +493,11 @@ streamlit run app.py
 [![Deploy to HuggingFace](https://huggingface.co/datasets/huggingface/badges/raw/main/deploy-to-spaces-sm.svg)](https://huggingface.co/new-space?template=ChanMeng666/emoji-story-generator)
 
 1. Fork this repository
-2. Create a new HuggingFace Space
+2. Create a new HuggingFace Space (SDK: Streamlit)
 3. Connect your GitHub repository
-4. Add your `HUGGINGFACE_API_TOKEN` in Space settings
-5. Deploy automatically
+4. Add your `HUGGINGFACE_API_TOKEN` as a Secret in Space settings
+5. Mount a **Storage Bucket** at `/data` (Read & Write) for persistent data backup
+6. Deploy automatically
 
 **Manual Cloud Deployment:**
 
@@ -520,20 +551,23 @@ streamlit run app.py --server.runOnSave true
 ### Advanced Features
 
 **Story Library Management:**
-- 📚 **Browse Stories**: View all generated stories sorted by popularity
-- 🗳️ **Community Voting**: Like your favorite stories to boost their ranking
-- 📊 **Story Analytics**: See vote counts and story statistics
+- 📚 **Browse Stories**: View all generated stories with card-based layout and rank badges
+- 🔍 **Search**: Filter stories by content or emojis via the search bar
+- 📊 **Sort Options**: Switch between Most Popular, Newest First, or Oldest First
+- 📄 **Pagination**: Navigate through stories 8 per page
+
+**Reactions & Interactions:**
+- 👍❤️⭐ **Three Reaction Types**: Like, Love, or Star any story (toggleable)
+- 📋 **Copy to Clipboard**: Click "Copy" to get the full story text
+- 🗑️ **Delete Own Stories**: Creators can remove their own stories (session-scoped)
+- 🕐 **Timestamps**: See when each story was created in relative time
 
 **Emoji Selection Tips:**
 - 🎯 **Diverse Categories**: Mix emojis from different categories for richer stories
-- 🎭 **Character Focus**: Include emotion emojis to define character personalities  
+- 🎭 **Character Focus**: Include emotion emojis to define character personalities
 - 🌍 **Setting Elements**: Add location and object emojis for detailed scenes
 - ⚖️ **Balanced Selection**: Use 3-5 emojis for optimal story coherence
-
-**Story Quality Optimization:**
-- 🔄 **Multiple Attempts**: Try different emoji combinations for varied narratives
-- 💡 **Creative Combinations**: Experiment with unexpected emoji pairings
-- 📝 **Story Feedback**: Use the voting system to identify popular story patterns
+- ↩️ **Undo**: Click "Undo" to remove the last emoji, or "Clear All" to start over
 
 ### API Integration
 
@@ -629,41 +663,54 @@ git add . && git commit -m "Update"     # Version control
 
 ### Code Structure
 
-**Main Application (`app.py`):**
-- 🎯 **Emoji Categories**: 8 categories with 200+ emojis
-- 🤖 **AI Integration**: HuggingFace Inference Providers API via huggingface_hub
-- 💾 **Data Management**: JSON-based story persistence
-- 🎨 **UI Components**: Streamlit interface components
-- 🗳️ **Voting System**: Community engagement features
+**Main Application (`app.py` ~950 lines):**
+
+| Section | Description |
+|---------|-------------|
+| **CUSTOM_CSS** | Full CSS theme with gradients, card layouts, hover effects, dark/light support |
+| **EMOJI_CATEGORIES** | 8 categories with 238+ emojis (Chinese internal names + English display) |
+| **Database Layer** | SQLite connection (`@st.cache_resource`), CRUD operations, JSON backup/restore |
+| **AI Generation** | HuggingFace Inference Providers API, prompt construction, response cleanup |
+| **UI Helpers** | `render_header()`, `render_emoji_tray()`, `render_story_card()`, `relative_time()` |
+| **main()** | Streamlit app: emoji picker → tray → generate → stories list with reactions |
 
 **Key Functions:**
-- `generate_story_with_ai()`: Core story generation logic
-- `query_huggingface()`: API communication handler
-- `load_stories()` / `save_stories_to_file()`: Data persistence
-- `main()`: Application entry point and UI rendering
+- `get_db()`: Cached SQLite connection, creates tables, restores from backup on startup
+- `add_story()` / `delete_story()`: Story CRUD with automatic JSON backup
+- `toggle_vote()`: Toggle like/love/star reactions with deduplication
+- `get_stories()`: Paginated query with sort and search support
+- `_backup_to_json()` / `_restore_from_backup()`: Persistent JSON backup in `/data`
+- `generate_story_with_ai()`: Prompt construction → API call → response cleanup
+- `query_huggingface()`: `InferenceClient.chat_completion()` wrapper
+- `render_story_card()`: Card UI with metadata, reactions, copy, and delete
 
 ### Adding New Features
 
 **1. New Emoji Categories:**
 
 ```python
-# Add to EMOJI_CATEGORIES dictionary
-EMOJI_CATEGORIES["New Category"] = [
-    "🆕", "📝", "✨", "🎉"  # Your emojis here
-]
+# Add to EMOJI_CATEGORIES dictionary in app.py
+EMOJI_CATEGORIES["新类别"] = ["🆕", "📝", "✨", "🎉"]
 
-# Update English translations
-ENGLISH_CATEGORIES["New Category"] = EMOJI_CATEGORIES["New Category"]
+# Add English display name in ENGLISH_CATEGORIES
+ENGLISH_CATEGORIES["🎉 New Category"] = "新类别"
 ```
 
-**2. Enhanced Story Formatting:**
+**2. Custom CSS Styling:**
 
 ```python
-def format_story(story, emojis):
-    """Add custom story formatting"""
-    formatted = f"🌟 {story} 🌟\n\n"
-    formatted += f"✨ Featured Emojis: {' '.join(emojis)}"
-    return formatted
+# Add styles to the CUSTOM_CSS string constant at the top of app.py
+CUSTOM_CSS = """
+<style>
+/* ... existing styles ... */
+
+/* Your custom styles */
+.my-component {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 16px;
+}
+</style>
+"""
 ```
 
 **3. Additional AI Parameters:**
@@ -712,29 +759,24 @@ git checkout -b feature/amazing-new-feature
 
 ### Contribution Ideas
 
-**🎨 UI/UX Improvements:**
-- Enhanced emoji selection interface
-- Better story display formatting
-- Mobile responsiveness improvements
-- Dark/light theme support
-
 **🤖 AI Enhancements:**
-- Alternative AI model integrations
-- Custom prompt templates
-- Story length options
-- Genre-specific generation
+- Alternative AI model integrations (GPT, Claude, etc.)
+- Custom prompt templates for different genres
+- Story length options (short/medium/long)
+- Multi-language story generation
 
 **📊 Features:**
-- User authentication system
-- Story export functionality
-- Advanced filtering options
-- Analytics dashboard
+- User authentication system (persistent identity across sessions)
+- Story export functionality (PDF/text)
+- Advanced emoji-based filtering (filter stories by emoji category)
+- Analytics dashboard for story statistics
+- Social sharing with Open Graph preview
 
 **🛠️ Technical:**
-- Database integration
-- API rate limiting
-- Caching improvements
-- Performance optimizations
+- API rate limiting per session
+- WebSocket for real-time vote updates
+- Automated testing suite
+- CI/CD pipeline
 
 ### Code Style Guidelines
 
