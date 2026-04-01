@@ -56,6 +56,9 @@ One-click **FREE** deployment of your creative story generator.
 > [!TIP]
 > Experience the intuitive interface and powerful AI story generation capabilities.
 
+<img width="2562" height="5734" alt="screencapture-huggingface-co-spaces-ChanMeng666-emoji-story-generator-2026-03-31-15_53_43" src="https://github.com/user-attachments/assets/7ff146a5-c08b-4ac7-8f91-12829d1bfdc8" />
+
+
 <div align="center">
   <img src="https://github.com/user-attachments/assets/ecaf4494-7e51-4b86-9e79-7548957d0bcd" alt="Main Interface" width="800"/>
   <p><em>Main Interface - Emoji Selection and Story Generation</em></p>
