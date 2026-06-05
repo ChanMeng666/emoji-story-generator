@@ -829,6 +829,17 @@ def main():
     # Inject custom CSS
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+    # Developer brand credit — Chan Meng
+    with st.sidebar:
+        st.image("brand/chan-meng-monkey.png", width=72)
+        st.markdown(
+            "**Built by Chan Meng**  \n"
+            "Need a custom app like this one?  \n"
+            "📧 [chanmeng.dev@gmail.com](mailto:chanmeng.dev@gmail.com)  \n"
+            "💻 [github.com/ChanMeng666](https://github.com/ChanMeng666)"
+        )
+        st.divider()
+
     # Initialize database
     get_db()
 
